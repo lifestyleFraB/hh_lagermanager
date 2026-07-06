@@ -1,10 +1,24 @@
 import 'dart:convert';
 // Nutzt die Web-Schnittstelle von Dart für den echten Datei-Download im Browser
+// ignore: undefined_shown_name
 import 'dart:html' as html;
+import 'dart:ui';
 import 'package:flutter/material.dart';
 
 void main() {
   runApp(const ProfiKlimaLagerApp());
+}
+
+// --- ERMÖGLICHT DAS WISCHEN AUF SMARTPHONES & NAVIGATION PER MAUS/TRACKPAD ---
+class WebScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind
+        .touch, // Aktiviert das Wischen mit dem Finger auf Mobilgeräten
+    PointerDeviceKind.mouse, // Erlaubt normales Klicken/Ziehen mit der Maus
+    PointerDeviceKind.trackpad, // Unterstützt Laptop-Trackpads
+    PointerDeviceKind.stylus, // Unterstützt Eingabestifte
+  };
 }
 
 class ProfiKlimaLagerApp extends StatelessWidget {
@@ -14,6 +28,7 @@ class ProfiKlimaLagerApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      title: "SKAYO Lager",
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
@@ -21,6 +36,7 @@ class ProfiKlimaLagerApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
       ),
+      scrollBehavior: WebScrollBehavior(), // Hier global für die App aktiviert
       home: const HauptLagerDashboard(),
     );
   }
@@ -194,7 +210,7 @@ class _HauptLagerDashboardState extends State<HauptLagerDashboard> {
     );
   }
 
-  // UPLOAD-DIALOG
+  // UPLOAD-DIALOG (Korrigiert ohne den fehlerhaften options-Parameter)
   void _zeigeUploadDialog() {
     final textController = TextEditingController();
     showDialog(
@@ -337,7 +353,6 @@ class _HauptLagerDashboardState extends State<HauptLagerDashboard> {
     );
   }
 
-  // DIALOG: ARTIKEL BEARBEITEN & NEUEM ORT ZUWEISEN
   void _zeigeArtikelBearbeitenDialog(LagerArtikel artikel) {
     final nameController = TextEditingController(text: artikel.name);
     final regalController = TextEditingController(text: artikel.genauesRegal);
@@ -410,7 +425,7 @@ class _HauptLagerDashboardState extends State<HauptLagerDashboard> {
               onPressed: () {
                 setState(() {
                   artikel.name = nameController.text;
-                  artikel.zoneId = gewaehlteZoneId; // Zuweisung des neuen Ortes
+                  artikel.zoneId = gewaehlteZoneId;
                   artikel.genauesRegal = regalController.text;
                   artikel.istBestand =
                       int.tryParse(bestandController.text) ??
@@ -454,7 +469,7 @@ class _HauptLagerDashboardState extends State<HauptLagerDashboard> {
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         title: const Text(
-          "HH Lagermanager", // Aktualisierter Anwendungsname laut Systemvorgabe
+          "SKAYO Lager",
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         actions: [
@@ -470,6 +485,7 @@ class _HauptLagerDashboardState extends State<HauptLagerDashboard> {
           ),
           PopupMenuButton<String>(
             tooltip: "Mehr Optionen",
+            // --- HIER WURDEN DIE AKTIONEN FÜR ORT & KATEGORIE AKTIVIERT ---
             onSelected: (wert) {
               switch (wert) {
                 case 'upload':
@@ -632,7 +648,6 @@ class _HauptLagerDashboardState extends State<HauptLagerDashboard> {
                               subtitle: Text(
                                 "${zoneDesArtikels.name} -> ${artikel.genauesRegal}",
                               ),
-                              // Interaktiver Trailing-Bereich mit Bearbeitungs-Stift
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -768,7 +783,231 @@ class _HauptLagerDashboardState extends State<HauptLagerDashboard> {
     );
   }
 
-  void _zeigeArtikelErstellenDialog() {}
-  void _zeigeOrtErstellenDialog() {}
-  void _zeigeKategorieErstellenDialog() {}
+  // --- ERSTELLEN-DIALOGE ---
+
+  void _zeigeArtikelErstellenDialog() {
+    final idController = TextEditingController();
+    final nameController = TextEditingController();
+    final spezifikationController = TextEditingController();
+    final regalController = TextEditingController();
+    final istBestandController = TextEditingController(text: "0");
+    final mindestBestandController = TextEditingController(text: "0");
+
+    String gewaehlteKategorie = _kategorien.firstWhere(
+      (k) => k != "Alle",
+      orElse: () => "",
+    );
+    String gewaehlteZoneId = _zonen
+        .firstWhere((z) => z.id != "all_zones", orElse: () => _zonen.first)
+        .id;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text("Neuen Artikel anlegen"),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: idController,
+                  decoration: const InputDecoration(
+                    labelText: "Artikelnummer / ID (z.B. FIL-ISO-02)",
+                  ),
+                ),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: "Artikelname"),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: gewaehlteKategorie,
+                  decoration: const InputDecoration(
+                    labelText: "Kategorie",
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _kategorien
+                      .where((k) => k != "Alle")
+                      .map((k) => DropdownMenuItem(value: k, child: Text(k)))
+                      .toList(),
+                  onChanged: (wert) =>
+                      setDialogState(() => gewaehlteKategorie = wert!),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: gewaehlteZoneId,
+                  decoration: const InputDecoration(
+                    labelText: "Lagerort / Zone",
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _zonen
+                      .where((z) => z.id != "all_zones")
+                      .map(
+                        (z) =>
+                            DropdownMenuItem(value: z.id, child: Text(z.name)),
+                      )
+                      .toList(),
+                  onChanged: (wert) =>
+                      setDialogState(() => gewaehlteZoneId = wert!),
+                ),
+                TextField(
+                  controller: spezifikationController,
+                  decoration: const InputDecoration(
+                    labelText: "Spezifikation / Maße",
+                  ),
+                ),
+                TextField(
+                  controller: regalController,
+                  decoration: const InputDecoration(
+                    labelText: "Genaues Regal / Position",
+                  ),
+                ),
+                TextField(
+                  controller: istBestandController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: "Aktueller Bestand",
+                  ),
+                ),
+                TextField(
+                  controller: mindestBestandController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: "Mindestbestand",
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Abbrechen"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (idController.text.isNotEmpty &&
+                    nameController.text.isNotEmpty) {
+                  setState(() {
+                    _inventar.add(
+                      LagerArtikel(
+                        id: idController.text,
+                        name: nameController.text,
+                        kategorie: gewaehlteKategorie,
+                        spezifikation: spezifikationController.text,
+                        zoneId: gewaehlteZoneId,
+                        genauesRegal: regalController.text,
+                        istBestand:
+                            int.tryParse(istBestandController.text) ?? 0,
+                        mindestBestand:
+                            int.tryParse(mindestBestandController.text) ?? 0,
+                      ),
+                    );
+                  });
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text("Hinzufügen"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _zeigeOrtErstellenDialog() {
+    final idController = TextEditingController();
+    final nameController = TextEditingController();
+    final imgController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Neuen Lagerort hinzufügen"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: idController,
+              decoration: const InputDecoration(
+                labelText: "Eindeutige ID (z.B. h3 oder c2)",
+              ),
+            ),
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: "Name des Ortes (z.B. Halle 3)",
+              ),
+            ),
+            TextField(
+              controller: imgController,
+              decoration: const InputDecoration(
+                labelText: "Bild-URL (Optional)",
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Abbrechen"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (idController.text.isNotEmpty &&
+                  nameController.text.isNotEmpty) {
+                setState(() {
+                  _zonen.add(
+                    LagerZone(
+                      id: idController.text,
+                      name: nameController.text,
+                      icon: Icons.warehouse,
+                      imageUrl: imgController.text.isEmpty
+                          ? null
+                          : imgController.text,
+                    ),
+                  );
+                });
+                Navigator.pop(context);
+              }
+            },
+            child: const Text("Hinzufügen"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _zeigeKategorieErstellenDialog() {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Neue Kategorie hinzufügen"),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: "Name der Kategorie"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Abbrechen"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (controller.text.isNotEmpty) {
+                setState(() {
+                  _kategorien.add(controller.text);
+                });
+                Navigator.pop(context);
+              }
+            },
+            child: const Text("Hinzufügen"),
+          ),
+        ],
+      ),
+    );
+  }
 }
