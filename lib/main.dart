@@ -469,7 +469,7 @@ class _HauptLagerDashboardState extends State<HauptLagerDashboard> {
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         title: const Text(
-          "SKAYO Lager",
+          "HuH_Lagermanager",
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         actions: [
