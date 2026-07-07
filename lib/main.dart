@@ -28,7 +28,7 @@ class ProfiKlimaLagerApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: "HH_Lagermanager",
+      title: "HuH_Lagermanager",
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
